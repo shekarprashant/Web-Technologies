@@ -1,0 +1,105 @@
+.up {
+	color:green;
+}
+.down {
+	color:red;
+}
+
+body {
+	background-image:url("Stock_Market.jpg");
+	background-size:cover;
+	background-repeat:no-repeat;
+	
+	margin-top:1.5em;
+	margin-bottom:1.5em;
+	margin-left:3em;
+	margin-right:3em;
+	
+	font-family:'Times New Roman', Times, serif;
+} 
+
+#FormTitle{
+
+ 	float:left;
+	color:white;	
+	font-size:150%;	
+	font-weight:bold;
+	padding:1em;
+	
+	position:relative;
+	left:0.9em;
+}
+
+#FormInput{
+	float:left;
+	
+	padding:1em;	
+	font-size:120%;
+	
+	position:relative;
+	top:0.1em;
+}
+
+#FormButton{		
+ 	padding:1em;
+	font-size:120%;
+}
+
+#Headlines{
+	float:left;
+	color:white;
+}
+
+#HeadlineNS{
+	color:white;
+	
+	font-size:200%;
+	font-weight:bold;	
+	width:100%;
+}
+
+#HeadlineNumbers{
+	font-size:210%;
+	font-weight:bold;
+}
+
+#HeadlineLTP{
+	color:white;
+}
+
+#HeadlineTable {
+	width:30em;
+}
+
+#HeadlineChange{
+	font-size:75%;
+}
+
+#HeadlineFB{
+
+}
+
+#StockChart{
+
+	width: 100%;
+	text-align:right;
+}
+
+hr {
+	color:white;
+}
+
+#StockInfoTable{
+	text-indent:1em;
+}
+
+#ErrorMessage{
+	font-size:250%;
+	font-weight:bold;
+	text-align:center;
+	color:white;
+	
+	position:relative;
+	left:-1.5em;
+	top:-1.5em;
+}

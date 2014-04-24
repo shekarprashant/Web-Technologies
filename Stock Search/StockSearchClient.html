@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<html>
+<head>
+	<title>Homework 8</title>
+	 <link rel="stylesheet" href="http://yui.yahooapis.com/gallery-2013.03.27-22-06/build/gallerycss-cssform/gallerycss-cssform-min.css">
+	<link rel="stylesheet" href="http://yui.yahooapis.com/3.13.0/build/cssbutton/cssbutton.css">
+	<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.14.1/build/tabview/assets/skins/night/tabview.css">
+	<link rel="stylesheet" type="text/css" href="Hw8-3.css">
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script type="text/javascript" src="http://yui.yahooapis.com/3.15.0/build/yui/yui-min.js"></script>
+
+	<script>
+		function isBlank(data)
+		{
+			if (data === null || data.length == 0)
+			{
+				return true;
+			}
+			return false;
+		}
+		
+		function isSymbolBlank()
+		{
+			var symbol = document.forms["stock_search"]["symbol"].value;
+			if (isBlank(symbol) === true)
+			{
+				alert("Please enter company name/symbol");
+				return false;
+			}
+			return true;
+		}	
+
+		//AutoComplete		
+		YUI().use("autocomplete", "autocomplete-highlighters", function (Y) {		
+			// JSONP URL source. Leave the {query} and {callback} placeholders
+			// as is; AutoComplete will replace them automatically.
+			var inputNode = Y.one("#symbol");
+			var formNode = Y.one("#stock_search");
+			
+			
+			inputNode.plug(Y.Plugin.AutoComplete, {
+				activateFirstItem: true,
+				resultHighlighter: "phraseMatch",
+				source: function (query, callback) {
+										
+					var YAHOO = window.YAHOO = {Finance: {SymbolSuggest: {}}};		
+					// Use JQuery to call Yahoo JSONP API
+					var ac_url = "http://autoc.finance.yahoo.com/autoc?query="+query+"&callback=?";						
+					$(document).ready(function(){					
+						$.ajax({
+							url: ac_url,						  
+							dataType: "jsonp",
+							jsonp: "callback",
+							jsonpCallback: "YAHOO.Finance.SymbolSuggest.ssCallback"
+						});
+					});
+
+					// Implement call back function for Yahoo symbol JSONP API
+					YAHOO.Finance.SymbolSuggest.ssCallback = function (data) {						
+						var suggestions = [];                            
+						$.each(data.ResultSet.Result, function(i, val) {                                                                 
+							suggestions.push(val.symbol+", "+val.name+" ("+val.exch + ")");
+						});
+               
+						callback(suggestions);
+					};					
+				}				
+			});				
+			
+			formNode.on("submit", catchSubmit);
+			
+			inputNode.ac.on("select", function (e) {
+				var result = e.result;
+				
+				inputNode.select();
+				inputNode.set("value", result.text);
+				inputNode.ac.hide();				
+				
+				catchSubmit(e);
+			});
+		});
+		
+		//Calling servlet
+		function catchSubmit(e)
+		{
+			if (isSet(e))
+			{
+				e.preventDefault();
+			}
+
+			// Get some values from elements on the page:			
+			var company = $("#symbol" ).val();
+			if (isBlank(company))
+			{
+				alert("Please enter company name/symbol");
+				return;
+			}
+			var commalocation = company.indexOf(",");
+			if (commalocation > 0)
+				company = encodeURIComponent(company.substring(0,commalocation));
+			url = "http://cs-server.usc.edu:32878/examples/servlet/SearchServlet";
+			
+			// Send the data using post			
+			var result = $.getJSON( url, { symbol: company } );
+				
+			// Put the results in a div
+			result.done(function(data) {
+				
+				setContent(data);
+			});
+		}
+		
+		function setContent(content)
+		{
+			var stockError = "Stock information not found!";
+			var newsError = "News Information Not Available.";
+			
+			$("#ErrorMessage").empty();
+			$("#HeadlineNS").empty();
+			$("#HeadlineLTP").empty();
+			$("#HeadlineChange").empty();
+			$("#HeadlineChange").removeClass();
+			$("#StockInfo").empty();
+			$("#StockChart").empty();
+			$("#StockNewsError").empty();
+			$("#StockNews").empty();
+			$("#HeadlineFB").empty();
+			$("#HorizontalLine").empty();
+			
+			//$("#ErrorMessage").append(JSON.stringify(content));
+			
+			if (!isSet(content) || !isSet(content.result) || !isSet(content.result.Quote))
+			{
+				$("#ErrorMessage").append(stockError);
+				return;
+			}
+			
+			var Quote = content.result.Quote;			
+			var HeadlineNS = { }, HeadlineChange = {}, HeadlineLTP = {};
+			var StockInfo = new Array(), StockInfoHeader = new Array();
+			
+			if (!isSet(Quote.Change))
+			{
+				$("#ErrorMessage").append(stockError);
+				return;
+			}
+			else
+			{
+				HeadlineChange["Change"] = Quote.Change;
+				if (isSet(Quote.ChangeType))
+				{
+					HeadlineChange["ChangeImage"] = getChangeImage(Quote.ChangeType, Quote.Change);
+					HeadlineChange["ChangeStyle"] = getChangeStyle(Quote.ChangeType);
+				}
+				else
+				{
+					HeadlineChange["ChangeImage"] = getChangeImage("", "");
+					HeadlineChange["ChangeStyle"] = getChangeStyle("");
+				}
+				
+			}
+			
+			if (isSet(content.result.Name))
+			{
+				HeadlineNS["Name"] = content.result.Name;
+			}
+			else
+			{
+				HeadlineNS["Name"] = "";
+			}
+
+			if (isSet(content.result.Symbol))
+			{
+				HeadlineNS["Symbol"] = content.result.Symbol;
+			}
+			else
+			{
+				HeadlineNS["Symbol"] = "";
+			}
+				
+			if (isSet(Quote.LastTradePriceOnly))
+			{
+				HeadlineLTP["LastTradePriceOnly"] = Quote.LastTradePriceOnly;
+			}
+			else
+			{
+				HeadlineLTP["LastTradePriceOnly"] = "";
+			}
+				
+			if (isSet(Quote.ChangeinPercent))
+			{
+				HeadlineChange["ChangeinPercent"] = Quote.ChangeinPercent;
+			}
+			else
+			{
+				HeadlineChange["ChangeinPercent"] = "";
+			}			
+
+			StockInfoHeader.push("Prev. Close");
+			if (isSet(Quote.PreviousClose))
+			{			
+				StockInfo.push(Quote.PreviousClose);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("Day's Range");			
+			if (isSet(Quote.DaysLow) && isSet(Quote.DaysHigh) && !isBlank(Quote.DaysLow) && !isBlank(Quote.DaysHigh))
+			{
+				StockInfo.push(Quote.DaysLow + " - " + Quote.DaysHigh);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+
+			StockInfoHeader.push("Open");
+			if (isSet(Quote.Open))
+			{
+				StockInfo.push(Quote.Open);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("52wk Range");
+			if (isSet(Quote.YearLow) && isSet(Quote.YearHigh) && !isBlank(Quote.YearLow) && !isBlank(Quote.YearHigh))
+			{
+				StockInfo.push(Quote.YearLow + " - " + Quote.YearHigh);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("Bid");
+			if (isSet(Quote.Bid))
+			{
+				StockInfo.push(Quote.Bid);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("Volume");			
+			if (isSet(Quote.Volume))
+			{
+				StockInfo.push(Quote.Volume);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("Ask");
+			if (isSet(Quote.Ask))
+			{
+				StockInfo.push(Quote.Ask);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+
+			
+			
+			StockInfoHeader.push("Avg Vol (3m)");
+			if (isSet(Quote.AverageDailyVolume))
+			{
+				StockInfo.push(Quote.AverageDailyVolume);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("1y Target Est");
+			if (isSet(Quote.OneYearTargetPrice))
+			{
+				StockInfo.push(Quote.OneYearTargetPrice);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			StockInfoHeader.push("Market Cap");
+			if (isSet(Quote.MarketCapitalization))
+			{
+				StockInfo.push(Quote.MarketCapitalization);
+			}
+			else
+			{
+				StockInfo.push("");
+			}
+			
+			if (isSet(content.result.StockChartImageURL))
+			{
+				StockChart = getStockChart(content.result.StockChartImageURL);
+			}
+			else
+			{
+				StockChart = getStockChart("");
+			}
+			var HeadlineNSContent = HeadlineNS["Name"] + "(" + HeadlineNS["Symbol"] + ")";
+			$("#HeadlineNS").append(HeadlineNSContent);
+			
+			var HeadlineLTPContent = HeadlineLTP["LastTradePriceOnly"] + " ";
+			$("#HeadlineLTP").append(HeadlineLTPContent);
+			
+			$("#HeadlineChange").append(HeadlineChange["ChangeImage"]);
+			
+			var HeadlineChangeContent = HeadlineChange["Change"] + "(" + HeadlineChange["ChangeinPercent"] + ")";
+			$("#HeadlineChange").append(HeadlineChangeContent);
+			$("#HeadlineChange").addClass(HeadlineChange["ChangeStyle"]);
+			
+
+			var StockChartContent = StockChart;
+			$("#StockChart").append(StockChartContent);
+			
+
+			var StockInfoContent = getStockInfoAsTable(StockInfoHeader, StockInfo, 2);			
+			
+			if (!isSet(content.result.News.Item))
+			{
+				StockNewsContent = newsError;
+			}
+			else
+			{
+				var Items = content.result.News.Item;
+				var StockNewsContent = getStockNewsAsTable(Items);
+			}
+			
+			YUI().use('tabview', function(Y) {
+				var tabview = new Y.TabView({
+					children: [{
+						label: "Quote Information",
+						content: StockInfoContent
+					}, 
+					{
+						label: "News Headlines",
+						content: StockNewsContent
+					}]
+				});
+
+				tabview.render('#StockInfo');
+
+			});
+			
+			var HeadlineFBContent = "<img src=\"facebook_logo.jpg\" id=\"FBImg\" style=\"cursor:pointer; padding-top:10px;\">";
+			$("#HeadlineFB").append(HeadlineFBContent);
+			$("#FBImg").click({param1: content}, postToFeed);
+			
+
+			$("#HorizontalLine").append("<hr/>");
+		}
+		
+		function isSet(data)
+		{
+			if (typeof(data) != undefined && data != undefined && data !== null)
+				return true;
+			return false;
+		}
+		
+		function getChangeImage(type, change)
+		{
+			var img_src_down = "http://www-scf.usc.edu/~csci571/2014Spring/hw6/down_r.gif";
+			var img_src_up = "http://www-scf.usc.edu/~csci571/2014Spring/hw6/up_g.gif";
+			
+			if (type.length == 0)
+				return "";			
+			
+			if (type.localeCompare("-") == 0)
+				return "<img src =" + img_src_down + "  width=3% height=auto>";
+
+			else if (type.localeCompare("+") == 0)
+			{
+				if(change == 0)
+					return "";
+				return "<img src =" + img_src_up + " width=3% height=auto>";
+			}
+
+			return "";
+		}
+		
+		function getChangeStyle(type)
+		{			
+			if (type.length == 0)
+				return "up";			
+			
+			if (type.localeCompare("-") == 0)
+				return "down";
+
+			return "up";
+		}
+		
+		function getStockChart(data)
+		{
+			
+			if (data.length == 0)
+				return "";			
+			
+			return "<img src =" + data + "\" width=\"260\" height=\"140\">";
+		}
+		
+		function getStockInfoAsTable(header, data, numcols)
+		{
+			var HTMLContent = "<table id=\"StockInfoTable\">";
+			for (var i = 0; i < data.length; i += numcols) {
+				HTMLContent += "<tr>";
+				
+				for (var j = 0; j < numcols; j++) {										
+					
+					var style_header = "", style = "";
+					if ((i+j)%2 == 0)
+					{
+						style_header = "width=\"270em\"";
+						style = "width=\"269em\" align=\"right\"";
+					}
+					else
+					{
+						style_header = "style=\"text-indent:2em;\" width=\"271em\"";
+						style = "width=\"270em\" align=\"right\"";
+					}
+					if (isSet(header[i + j]))
+					{
+						HTMLContent += "<td "+ style_header +">" + header[i+j] + ":";
+					}
+					else
+					{
+						HTMLContent += "<td "+ style_header +">";
+					}
+						
+					if (isSet(data[i + j]))
+					{
+						HTMLContent += "<td  "+ style +">" + data[i+j];
+					}
+					else
+					{
+						HTMLContent += "<td "+ style +">";
+					}					
+				}
+				HTMLContent += "</tr>";
+			}
+			HTMLContent += "</table>";			
+			return HTMLContent;
+		}
+		
+		function getStockNewsAsTable(items)
+		{
+			var HTMLContent = "<table id=\"StockNewsTable\">";
+			HTMLContent += "<tr><td colspan=4><ul>";
+			if (!isSet(items.length))
+			{
+				if (isSet(items.Title))
+				{				
+					news_title = items.Title;
+					if (isSet(items.Link))
+					{
+						news_link = "<a href=" + items.Link + " target=_blank>";
+						news_link_end = "</a>"; 
+					}
+					else
+					{
+						news_link = "";
+						news_link_end = "";
+					}									
+								
+					HTMLContent+= "<li>" + news_link + news_title + news_link_end;
+									
+				}
+				
+			}
+			else
+			{
+				for (var i = 0; i < items.length; i++) {
+					var item = items[i];
+					if (isSet(item) && isSet(item.Title))
+					{				
+						news_title = item.Title;
+						if (isSet(item.Link))
+						{
+							news_link = "<a href=" + item.Link + " target=_blank>";
+							news_link_end = "</a>"; 
+						}
+						else
+						{
+							news_link = "";
+							news_link_end = "";
+						}									
+									
+						HTMLContent+= "<li>" + news_link + news_title + news_link_end;
+										
+					}
+				}
+			}
+			HTMLContent += "</tr></table>";	
+			return HTMLContent;
+		}
+		
+		//Posting to Facebook
+		function postToFeed(event) {
+			
+			if (!isSet(event) || !isSet(event.data) || !isSet(event.data.param1))
+			{
+				alert('Post was not published.');   
+				return;
+			}
+			result = event.data.param1;
+			FB.ui(
+			{
+				method: 'feed',
+				name: (result.result.Name ? result.result.Name : "NA") ,
+				caption: "Stock Information of " + (result.result.Name ? result.result.Name : "NA")
+									+ " "+(result.result.Symbol ? "("+result.result.Symbol+")" : "") ,
+				description: "Last Trade Price: "+ (result.result.Quote.LastTradePriceOnly ? result.result.Quote.LastTradePriceOnly : "NA") 
+										+", Change: "+ (result.result.Quote.ChangeType ? result.result.Quote.ChangeType : "")
+										+""+ (result.result.Quote.Change ? result.result.Quote.Change : "NA")
+										+"("+ (result.result.Quote.ChangeinPercent ? result.result.Quote.ChangeinPercent : "NA") +")",
+				link: (result.result.Symbol ? "http://finance.yahoo.com/q?s="+result.result.Symbol : "http://finance.yahoo.com"),
+				picture: (result.result.StockChartImageURL ? result.result.StockChartImageURL : "")   
+			},
+
+			function(response) {
+				if (response && response.post_id) {   
+					alert('Post was published.');
+				} 
+				else 
+				{  
+					alert('Post was not published.');   
+				}   
+			}); 
+		}
+	
+	</script>
+	
+
+</head>
+<body class="yui3-skin-sam"> 
+
+	<div id="fb-root" style="display:none"></div>
+    <script>
+	 window.fbAsyncInit = function() {
+		FB.init({    appId      : "639409859486461", // App ID from the App Dashboard
+			channelUrl : "http://cs-server.usc.edu:32878/examples/servlets/producer/channel.html",
+			status     : true, // check the login status upon init?
+			cookie     : true, // set sessions cookies to allow your server to access the session?
+			xfbml      : true  // parse XFBML tags on this page?    
+		});
+	};
+
+    (function(d, s, id){
+		var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) {return;}
+        js = d.createElement(s); js.id = id;
+        js.src = "//connect.facebook.net/en_US/all.js";
+        fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    </script>
+
+
+	<form name="stock_search" id="stock_search" method="GET" class="yui3-form">	
+		<div id="FormTitle">Company:</div>
+		<div id="FormInput">
+			<input type="text" name="symbol" id="symbol" placeholder="Enter company symbol" size="90%">
+		</div>
+		<div id="FormButton">
+			<button name="Search" id="Search" class="yui3-button">Search</button>	
+		</div>
+	</form>
+	
+	<br/>
+	<div id="Headlines">
+		<table>
+			<tr>
+				<td id="HeadlineTable"><span id="HeadlineNS"></span>	
+			</tr>
+			<tr>
+				<td>
+				<div id="HeadlineNumbers">
+					<span id="HeadlineLTP"></span>
+					<span id="HeadlineChange"></span>
+				</div>
+			</tr>
+			<tr>
+				<td><span id="HeadlineFB"></span>
+			</tr>
+		</table>
+	</div>
+
+	<div id="StockChart"></div>	
+
+	<br/>
+	<br/>
+	<div id="HorizontalLine"></div>
+	<br/>
+	<br/>
+	
+	<div id="StockInfo"></div>
+	<div id="ErrorMessage"></div>
+	<br/>
+
+	
+	
+<NOSCRIPT>
+</body>
+</html>
